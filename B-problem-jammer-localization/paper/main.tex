@@ -1,0 +1,201 @@
+% !TEX program = xelatex
+% 2026 年全国大学生数学建模竞赛 B 题论文
+% 编译：xelatex main.tex（两遍）
+\documentclass[11pt,a4paper]{ctexart}
+\usepackage[fontset=mac]{ctex}
+\usepackage[a4paper,top=2.6cm,bottom=2.6cm,left=2.8cm,right=2.8cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{booktabs,tabularx,array}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage[colorlinks,linkcolor=black,citecolor=black,urlcolor=black]{hyperref}
+\graphicspath{{../figures/}{./figures/}}
+
+\captionsetup{font=small,labelfont=bf}
+\setlist{nosep,leftmargin=2em}
+\linespread{1.30}
+\setlength{\parskip}{0.12em}
+\setlength{\emergencystretch}{3em}
+\makeatletter
+\renewcommand{\verbatim@font}{\ttfamily\footnotesize}
+\makeatother
+
+% 记号
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\Arena}{\mathcal{A}}
+\newcommand{\Reg}{\mathcal{R}}
+\newcommand{\Wedge}{\mathcal{W}}
+\newcommand{\conv}{\operatorname{conv}}
+\newcommand{\diam}{\operatorname{diam}}
+\newcommand{\MEC}{\mathrm{MEC}}
+\newcommand{\jj}{J}
+
+\title{\heiti 无线电干扰源的快速自动定位与清除：\\集值估计、最优观测点设计与滚动调度}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-3.6em}
+
+\begin{center}{\large\heiti 摘\quad 要}\end{center}
+
+本文研究机器狗携带测向机在半径 $1800$ m 圆域内搜索、定位并清除 $10\!\sim\!16$ 个未知无线电干扰源的问题，目标是最小化定位清除总时间。我们指出该问题的\textbf{本质是集值估计而非随机估计}——题面规定"同一地点的示向度误差是固定的、全局落在 $[-1^\circ,1^\circ]$ 内"，因此误差是\textbf{位置相关的确定性偏差场}，$\pm1^\circ$ 是硬约束，真实源必落在可精确计算的凸可行域内。这一认识把四个问题统一为"可行域 $\to$ 不确定度 $\to$ 观测点设计 $\to$ 路径调度"的递进链条，也解释了为什么问题一偏偏要问"直径"：\textbf{问题一在为问题二提供损失函数}。
+
+\textbf{针对问题一}，将"方位约束"化为两条边界射线确定的 $2^\circ$ 楔形半平面，"接收约束"化为半径 $1500$ m 的圆盘，得定位区域 $\Reg=\Arena\cap\bigcap_i\bigl(\Wedge(P_i,\theta_i^\pm)\cap \overline{B(P_i,1500)}\bigr)$，是\textbf{凸多边形}；用半平面裁剪（Sutherland--Hodgman）+ 顶点枚举/旋转卡壳给出直径的 $O(n^2)$ 算法。对"以直径为直径的圆能否覆盖此区域"这一问，我们给出\textbf{严格判据（Thales）}：设 $AB$ 为区域直径，则覆盖成立当且仅当对区域每个顶点 $V$ 有 $\angle AVB\ge 90^\circ$；并由 Jung 定理给出普适上界 $R_{\MEC}\le \diam/\sqrt{3}$（最坏只超出 $15.47\%$）。算例 $S_1{=}(0,0),S_2{=}(1200,300),G{=}(900,800)$ 得 $D=50.88$ m、$R_{\MEC}=25.44$ m $=D/2$、最小张角 $100.67^\circ$，判据成立；对 $m=2,3,4,5$ 个观测点各做 $4\times10^4$ 次随机构型搜索，实测最坏超出仅 $\mathbf{1.48\%/9.41\%/6.74\%/5.11\%}$，远未触及 Jung 上界——故\textbf{“不必然覆盖”但“实际几乎总成立”}，且不能当作严格保证。
+
+\textbf{针对问题二}（本题最关键的原创结论），把"定位效果好"翻译为"第二次测量后期望的定位区域直径"，并叠加"第二次收不到信号"的惩罚，得到 $J(S_2)=P_{\rm fail}\cdot 1500+\E[\diam\mid\text{成功}]$；源距离先验取 $\propto d\cdot P(r_k\ge d)$（$r_k\sim U[1000,1500]$）。数值最优解为\textbf{偏角 $\alpha^*=31.5^\circ$、距离 $\rho^*=1054$ m、$J^*=50.3$ m}，候选带为 $|S_1S_2|\in[970,1150]$ m、$|\alpha|\in[25^\circ,40^\circ]$（左右镜像）。根因是一条贯穿全题的\textbf{保证接收约束} $|S_1S_2|^2-2|S_1G|\cos\alpha\,|S_1S_2|+|S_1G|^2\le r_{\min}^2$，即 $|\alpha|\le\arcsin(1000/d)$，当 $d\to1500$ m 时上界收敛到 $41.8^\circ$——\textbf{纯侧移在几何上不可能保证收到远端源}。由此给出两个必须写进论文的反直觉结论：\textbf{"垂直 $90^\circ$"是错的}（$\rho{=}1000$ m 时 $P_{\rm fail}{=}0.633$，$J{=}973$ m，是最优解的 $19$ 倍）；\textbf{"沿示向度直走"也是错的}（两次方位线近共线，区域不收缩，$J{=}1280$ m）。
+
+\textbf{针对问题三}，先算清下界：以 $r_{\min}$ 圆盘覆盖全域要求观测点环半径 $a\le1000$ m 且 $a\ge997.2$ m，故\textbf{最少 $7$ 站}（$m=6$ 时两约束矛盾，无解），所选 $7$ 站等角环 @$1000$ m 周长 $6074$ m、自圆心入环巡回路程 $7074$ m；"事先知道全部源位置"的 oracle TSP 下界三档平均 $9452$ m $=1890$ s，\textbf{并入覆盖环后的有效下界为 $11\,536$ m $=2307$ s}。由于官方模拟器仅提供 Windows 版，我们依据附件 1/2 的计时与接口语义\textbf{自建等价模拟器}，逐秒复现了附件 1 示例的 $105/111/194/199$ s 四个时刻（完全吻合），并在其上提出\textbf{"滚动重规划"算法}：维护"未扫站点 / 主动定位 / 待清剿"三类任务，每步用 2-opt 巡回的前瞻首站执行单个动作后立即按新信息重排。单因子对照表明：与"先扫完再清剿"的两趟式相比，路程由 $15\,567$ m 降至 $14\,765$ m、检测次数由 $124.3$ 降到 $106.2$ 次。$50$ 局蒙卡演练结果：\textbf{被清除干扰源比例 $100\%$（$50/50$ 局全清），定位清除总时间均值 $3754$ s、中位 $3610$ s、区间 $[3037,5062]$ s，平均每源 $293$ s}，约为有效下界的 $1.63$ 倍；对平滑场/独立同分布/分块常数三种误差场模型与六组相关长度，清除率\textbf{恒为 $100\%$}——这正是集值估计只用 $\pm1^\circ$ 硬界、与误差相关结构无关的必然结果。
+
+\textbf{针对问题四}，我们证明了一条\textbf{结构性结论}：设源位置半径 $\rho$、有效接收半径 $r_k$、环上观测点半径 $a$，则覆盖判据为 $\mathrm{cov}=a\cos(\beta-\alpha)-\rho$（$\beta$ 为站方位、$\alpha$ 为源的辐射主方向）。当 $\rho>a$ 且源\textbf{朝向圆心辐射}时 $\mathrm{cov}<0$ 恒成立，\textbf{单圆环在几何上永远看不到该源}；仿真实测单环下有 $44.6\%$ 的定向源完全漏检，而\textbf{全向源漏检率恒为 $0\%$}。同时给出一个\textbf{零成本的定向源判据}：全向源只要 $|P_0G|\le r_k$ 必有信号，故"在距估计位置 $<1000$ m 处仍 \texttt{no\_signal}"只可能来自定向阴影——该判据在全向场景下误触发率为 $\mathbf{0\%}$。据此设计\textbf{自适应双环策略}：内环 $7$ 站 @$1000$ m 保证覆盖，外环 $5$ 站 @$1700$ m 捕捉朝内源，\textbf{仅当判据证实存在定向源时才启动外环}。$50$ 局演练结果：定向源比例 $20\%$ 时清除率 $96.5\%$、$35\%$ 时 $94.25\%$（单环基线仅 $81.3\%$），定向比例 $100\%$ 时仍达 $90.9\%$（基线仅 $55.0\%$）；而全向场景因判据不触发，开关外环所得 $50$ 局结果逐局完全相同（$3754$ s），实现\textbf{"按需付费"}。进一步，我们证明了一条\textbf{胞元顶点覆盖引理}（源朝任意方向辐射，必落在其所在胞元某个顶点的覆盖半平面内），据此给出一个能对\emph{任意}（位置, 方向）组合保证 $100\%$ 可测的\textbf{三角格兜底布局}（$h=950$ m、$31$ 站、巡回 $29\,195$ m，抽样失败率 $0$），仅在常规手段停滞时按需启用。此外还指出\textbf{清剿阶段不受方向影响}（光学/激光定位与辐射方向无关），故问题四的难点全部在"测得到"而非"清得掉"。
+
+本文全部数值结果均由自建等价模拟器与独立几何脚本实测得到（共 $1100$ 余局演练 + $2\times10^5$ 次随机构型抽样），关键结论均给出算法、公式与可复现代码（含基线对照与消融脚本）；程序用统一接口编写，把传输层由本地换为 HTTP 即可对官方模拟器运行。
+
+\vspace{0.6em}
+\noindent\textbf{关键词}：集值估计；凸可行域；最小包围圆；Jung 定理；Thales 判据；最优观测点设计；滚动重规划；定向源阴影；蒙特卡洛演练
+\newpage
+
+\section{问题重述}
+
+\subsection{问题背景}
+
+某区域的无线电干扰源会干扰正常通信，需要用一台携带测向机的机器狗在\textbf{半径 $1800$ m 的圆形目标区域}内自主搜索、定位并清除这些干扰源，\textbf{总时间越短越好}。干扰源的关键特征（题面附录 1）为：
+
+\begin{itemize}
+  \item \textbf{数量未知}：区域内存在 $10\!\sim\!16$ 个干扰源，接口不返回个数；
+  \item \textbf{一源一频道}：每个干扰源占用 $1\!\sim\!20$ 号频道中的\textbf{一个且互不重复}的频道，全测试期不变；
+  \item \textbf{类型}：\textbf{全向源}向四周 $360^\circ$ 均匀辐射；\textbf{定向源}只向某个主方向 $\varphi$ 的两侧各 $90^\circ$（合计半平面）辐射，主方向未知；
+  \item \textbf{有效接收半径 $r_k$}：辐射场强随距离衰减，$r_k\in[1000,1500]$ m 且逐源不同、未知；在覆盖角度内且距离不超过 $r_k$ 时才能被检测到；
+  \item \textbf{示向度误差}：测得的示向度与真实方位角之差落在 $[-1^\circ,1^\circ]$ 内；题面强调"在一段时间内同一地点的电磁环境干扰是固定的，所以\textbf{重复检测不会改变检测误差}"，即误差是\textbf{位置相关的确定性偏差}，只有跨地点看才呈统计规律。
+\end{itemize}
+
+机器狗的速度为 $5$ m/s，仅有 $/$\texttt{enter}、$/$\texttt{measure}、$/$\texttt{clear}、$/$\texttt{exit} 四条指令。动作与虚拟世界耗时见表~\ref{tab:actions}；其中移动与换频道没有独立指令，由模拟器根据前后两次指令的位置/频道参数自动推断。虚拟计时规则的四个关键点：\textbf{检测固定 $5$ s}；\textbf{任意两频道间切换固定 $1$ s}；\textbf{清除未发现 $3$ s、成功 $5$ s}（光学精确定位 $3$ s，命中后再耗 $2$ s 激光清除）；\textbf{移动耗时 $=$ 直线距离$/5$}。特别地，\texttt{/clear} 的频道参数只用于指定"要尝试清除的目标源"，\textbf{不切换测向机当前频道、也不产生切换耗时}；清除半径 $20$ m 且\textbf{与辐射方向无关}（定向源在背后也能清除）。
+
+\begin{table}[H]
+\centering
+\caption{机器狗动作与通信指令、虚拟世界耗时}
+\label{tab:actions}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lll >{\raggedright\arraybackslash}p{4.5cm}@{}}
+\toprule
+动作 & 指令 & 虚拟耗时 & 说明 \\
+\midrule
+开始 / 结束 & \texttt{/enter}、\texttt{/exit} & $0$ & 开始/结束计时，本身不耗时 \\
+检测 & \texttt{/measure} & $5$ s & 返回 \texttt{direction}$+$\texttt{svd\_deg}、\texttt{near}、\texttt{no\_signal} \\
+精确定位并清除 & \texttt{/clear} & 未发现 $3$ s / 成功 $5$ s & 半径 $20$ m，与方向无关，不切换频道 \\
+切换频道 & 由 \texttt{/measure} 的 \texttt{channel} 推断 & $1$ s & 任意两频道之间均 $1$ s；\texttt{/clear} 不触发 \\
+移动 & 由 \texttt{position} 推断 & $d/5$ s & 速度 $5$ m/s，可超出目标区域 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+运行约束：测试窗口 $25$ min，$/$\texttt{enter} 后程序运行时间最长 $20$ min（$\le 1200$ s），虚拟世界活动上限 $100$ h。因此\textbf{虚拟时间是优化目标，真实程序运行时间 $1200$ s 才是硬约束}。
+
+\subsection{待解决的问题}
+
+\begin{itemize}
+  \item \textbf{问题一}：建立"多次检测后定位干扰源所在区域"的数学模型，给出\textbf{计算该区域直径的算法}；并判断：以该直径为直径作圆，这个圆是否一定能覆盖定位出的区域？
+  \item \textbf{问题二}：当测得目标方位角后需选择第二个检测点位置时，\textbf{如何选才能使定位效果最好}？给出你的选择策略与最优位置范围。
+  \item \textbf{问题三}：区域内存在 $10\!\sim\!16$ 个干扰源时，设计\textbf{总时间最短}的搜索与清除策略，在官方模拟器上完成演练测试，并按指定格式提交 $3$ 次正式测试结果。
+  \item \textbf{问题四}：若区域内\textbf{混入若干定向干扰源}，你的策略是否需要调整？给出调整后的策略与测试结果。
+\end{itemize}
+
+\section{问题分析}
+
+\subsection{六条决定方案上限的本质洞察}
+
+\noindent\textbf{洞察 1｜这是集值（set-membership）估计，不是随机估计。}
+题面明确"同一地点重复检测误差不变、全局落在 $[-1^\circ,1^\circ]$"，这意味着误差不是白噪声，而是\textbf{位置相关的确定性偏差场} $\varepsilon(P)$。因此 $\pm1^\circ$ 是\textbf{硬约束}，真实源必定落在由这些硬约束交出的\textbf{可行域} $\Reg$ 内，且 $\Reg$ 可以被精确计算（无需任何概率假设）。所有"估计不确定性"都应表达为 $\Reg$ 的几何量（直径、面积），而不是协方差。
+
+\noindent\textbf{洞察 2｜每次检测同时给出角度约束与径向约束，交会区域天然有界。}
+一次 \texttt{direction} 返回的不仅是方位，还蕴含 $|PG_k|\le1500$。纯方位交会（只取角度）一般\textbf{无界}（两条射线总是相交于一点，但测量有 $\pm1^\circ$ 误差时两条射线带交出一个越远越宽的"喇叭"）；补上 $|PG_k|\le r_k\le1500$ 与目标区域 $\Arena$ 的约束后，可行域成为\textbf{有界凸多边形}——这正是问题一能问"直径"的前提。
+
+\noindent\textbf{洞察 3｜$20$ 个频道 $=20$ 个解耦的独立估计问题，路径是唯一耦合。}
+频道之间无任何相互影响（不同源不同频道、清除互不影响），因此每个频道可独立做滤波/交集更新；唯一的耦合是\textbf{机器狗只能走一条路}。故全题算法骨架必然是"上层路径调度 $+$ 下层逐频道信息融合"。
+
+\noindent\textbf{洞察 4｜\texttt{/clear} 是廉价的近距二值传感器。}
+\texttt{/clear} 代价为"移动到该点 $+$ $3$ s"（未发现）或 $+5$ s（成功），而它能在一个半径 $20$ m 的圆内作\textbf{确定性的存在性判定}（"有则必中，无则必空"）。用 $20$ m 网格搜索一个长 $W$、宽 $H$ 的区域，代价约 $3\cdot\frac{WH}{20^2}$ s 的清除动作时间，而若改用 \texttt{/measure} 补测，每次要 $5$ s 且移动更远。\textbf{当可行域直径压到约 $100$ m 量级时，"直接清剿"比"继续补测"更便宜}，于是存在一个最优的"停止测向、转向清剿"阈值。
+
+\noindent\textbf{洞察 5｜问题二的真张力是"交会条件数"与"接收保证"的直接冲突。}
+要提高定位精度，第二检测点应尽量拉开基线宽度（几何精度因子 GDOP 最优）；但一旦离开示向度方向，就\textbf{不能保证}源仍在有效接收半径内——源距离未知，$r_k\ge1000$ m 而下界只有 $1000$ m。两者在几何上是矛盾的，最优解必须在这条约束边界上。这一点是本问的核心，也是绝大多数方案会答错的地方。
+
+\noindent\textbf{洞察 6｜定向源把"无信号"从"距离太远"变成"半平面阴影"。}
+对全向源，\texttt{no\_signal} $\iff$ $|PG_k|>r_k\ge1000$，是一条\textbf{外部圆盘}约束（凹）；对定向源，\texttt{no\_signal} 还可能是落在阴影半平面里，于是\textbf{区域不再是凸集}，且可能出现"在覆盖内反而收不到"的反常现象。更进一步：若源朝圆心辐射且位于观测环外侧，则整个观测环都落在阴影里，\textbf{该源对内环完全不可见}。清除环节不受方向影响（光学定位），故问题四的难点\textbf{全部在"测得到"而非"清得掉"}。
+
+\subsection{技术路线}
+
+四个问题形成一条\textbf{"不确定度定义 $\to$ 不确定度最小化 $\to$ 不确定度驱动的路径规划"}的递进链条，如图~\ref{fig:route} 所示。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{B_fig4_q3_layout_path.png}
+\caption{技术路线与观测点布局（左：内环保证覆盖、外环捕捉朝内定向源；右：一局完整轨迹）}
+\label{fig:route}
+\end{figure}
+
+\begin{enumerate}
+  \item \textbf{步骤一（问题一）}：把"一次检测"翻译成有序半平面约束，得到凸可行域 $\Reg$；把"不确定度"定义为 $\diam(\Reg)$，并给出其算法；回答"直径圆是否覆盖"给出 Thales 判据与 Jung 上界。
+  \item \textbf{步骤二（问题二）}：以 $\diam$ 为损失，在"接收保证"约束下最大化第二次观测的信息增益，解出最优观测点。
+  \item \textbf{步骤三（问题三）}：把 $\diam$ 作为"是否转入清剿"的阈值，设计"观测点布局 $+$ 滚动重规划调度"，用自建等价模拟器做大规模蒙卡演练。
+  \item \textbf{步骤四（问题四）}：识别定向源带来的非凸性与几何盲区，给出零成本的定向源判据与自适应双环策略。
+\end{enumerate}
+
+\section{模型假设与符号说明}
+
+\subsection{模型假设}
+
+\begin{itemize}
+  \item[A1] 示向度误差 $\varepsilon(P)\in[-1^\circ,1^\circ]$ 是位置的确定性函数（同点重复检测完全一致），本文所有推断只用该硬界，不假设其分布形式。
+  \item[A2] 干扰源位置 $G_k\in\Arena$ 在测试期内静止，且\textbf{已知其位于目标区域内}（题面给出区域范围），故可行域一律与 $\Arena$ 求交。
+  \item[A3] 有效接收半径 $r_k\in[1000,1500]$ m，逐源独立未知；凡出现 \texttt{direction} 即知 $|PG_k|\le1500$（因为 $r_k\le1500$）。
+  \item[A4] 机器狗位置可精确控制并瞬时到达指定坐标（移动耗时按 $d/5$ 计），路径为空间折线。
+  \item[A5] 各频道完全解耦：对某频道的检测不受其他频道干扰源影响。
+  \item[A6] 定向源辐射只在主方向两侧各 $90^\circ$ 内有效；\texttt{/clear} 的光学精确定位与方向无关。
+  \item[A7] 源个数 $N$ 在 $[10,16]$ 上等可能（用于论证"下限 $10$"与"上限 $16$"两类终止条件）。
+\end{itemize}
+
+\subsection{符号说明}
+
+\begin{table}[H]
+\centering
+\caption{主要符号}
+\label{tab:sym}
+\small
+\begin{tabular}{cl@{\qquad}cl}
+\toprule
+符号 & 含义 & 符号 & 含义 \\
+\midrule
+$\Arena$ & 目标区域（半径 $1800$ m 圆盘） & $D(\Reg)$ & 凸区域 $\Reg$ 的直径 \\
+$G_k$ & 第 $k$ 个干扰源的位置 & $\Reg$ & 定位可行域（凸多边形） \\
+$r_k$ & 第 $k$ 个源的有效接收半径 & $R_{\MEC}$ & $\Reg$ 的最小包围圆半径 \\
+$\varphi_k$ & 定向源主方向 & $a,\ m$ & 观测环半径与站数 \\
+$P_i,\ \theta_i$ & 第 $i$ 个观测点及其测得示向度 & $\rho,\ \alpha$ & 第二观测点的距离与偏角 \\
+$\varepsilon$ & 示向度误差（$|\varepsilon|\le1^\circ$） & $\jj(S_2)$ & 第二点选择的目标函数 \\
+$T$ & 定位清除总时间（优化目标） & $P_{\rm fail}$ & 第二点收不到信号的概率 \\
+$L$ & 总路程 & $d$ & 源到第一观测点的距离 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\medskip
+\noindent\textbf{符号复用说明}：$\rho,\alpha$ 在问题二指第二观测点的极坐标（$\rho=|S_1S_2|$、$\alpha$ 为其相对示向度的偏角）；在问题四的阴影几何（第~\ref{sec:q4} 节）中 $\rho=|OG|$ 改指\emph{源的位置半径}，$\alpha$ 为源的辐射主方向角、$\beta$ 为观测站方位角，$\delta$ 为主方向与径向的夹角。请按节区分。
+
+\medskip
+\noindent 总时间可写为四项之和：
+\begin{equation}
+T=\underbrace{5M}_{\text{检测}}+\underbrace{N_{\rm sw}}_{\text{换频道}}+\underbrace{3F+5S}_{\text{清除}}+\underbrace{L/5}_{\text{移动}},
+\label{eq:T}
+\end{equation}
+其中 $M$ 为检测次数、$N_{\rm sw}$ 为换频道次数、$F/S$ 为失败/成功清除次数。\textbf{移动项 $L/5$ 通常是主导项}（实测占比 $79\%$），因此策略设计的核心是把路程压到接近 TSP 下界。
+
+\input{sec_q1q2}
+\input{sec_q3}
+\input{sec_q4}
+
+\end{document}

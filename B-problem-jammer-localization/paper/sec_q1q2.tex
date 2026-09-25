@@ -1,0 +1,256 @@
+\section{问题一：定位区域及其直径的算法}
+
+\subsection{一次检测的信息：有序半平面约束}
+
+设机器狗在 $P=(x_P,y_P)$ 处对某频道检测，测得示向度 $\theta$（以 $x$ 轴正向为 $0^\circ$，逆时针为正）。由洞察 1、2：
+
+\begin{itemize}
+  \item 若返回 \texttt{direction}：真实源 $G$ 满足
+  \begin{equation}
+  G\in\Wedge(P,\theta)\cap\overline{B(P,R_{\max})},\qquad
+  \Wedge(P,\theta)=\Bigl\{Q:\bigl|\angle(Q-P)-\theta\bigr|\le 1^\circ\Bigr\},
+  \end{equation}
+  其中 $R_{\max}=1500$ m。"落在 $\pm1^\circ$ 楔形内"等价于 $G$ 同时位于\textbf{两条边界射线的同侧}：
+  \begin{equation}
+  (G-P)^{\!\top} n_\pm\ \ge\ 0,\qquad
+  n_\pm=\pm\Bigl(-\sin(\theta\mp1^\circ),\ \cos(\theta\mp1^\circ)\Bigr),
+  \label{eq:wedge}
+  \end{equation}
+  其中法向符号由"楔内测试点"唯一确定（取 $P+300(\cos\theta,\sin\theta)$ 代入取正）。\textbf{这一点很容易出错}：不能凭边界点判符号，否则会把楔形方向翻转。
+  \item 若返回 \texttt{near}：$|G-P|\le5$ m，得到 $\overline{B(P,5)}$ 这一小圆盘约束（且可立即原地清剿）。
+  \item 若返回 \texttt{no\_signal}：对全向源得 $|G-P|>r_k\ge1000$，是凹约束，本文在问题一至三中\textbf{保守地丢弃}该信息（不用会略微放大区域，但保证不产生漏解）；在问题四中该信息被重新启用，见第~\ref{sec:q4} 节。
+\end{itemize}
+
+于是 $n$ 次检测后的定位可行域为凸多边形的交集
+\begin{equation}
+\boxed{\ \Reg=\Arena\ \cap\ \bigcap_{i=1}^{n}\Bigl(\Wedge(P_i,\theta_i)\cap\overline{B(P_i,R_{\max})}\Bigr)}
+\label{eq:region}
+\end{equation}
+（\texttt{near} 时对应的 $\overline{B(P_i,5)}$ 取代 $\Wedge\cap\overline{B}$）。
+
+\subsection{直径算法}
+
+$\Reg$ 是凸多边形，设其顶点（已按逆时针排序）为 $V_1,\dots,V_n$（$n$ 通常为 $3\!\sim\!6$）。
+
+\noindent\textbf{算法 1（凸多边形直径）}
+\begin{enumerate}
+  \item \textbf{裁剪}：从覆盖全域的大圆内接 $K$ 边形（本文 $K=144$）出发，对式~\eqref{eq:region} 中每个约束按 Sutherland--Hodgman 做半平面裁剪，圆盘用内接正多边形近似（$K=72$ 边形，误差 $<0.1\%$）。复杂度 $O(nK)$。
+  \item \textbf{顶点枚举}：$\diam=\max_{1\le i<j\le n}\|V_i-V_j\|$，$O(n^2)$。由于 $n$ 很小，本文直接用枚举；若 $n$ 很大可用旋转卡壳降到 $O(n)$。
+  \item \textbf{退化保护}：若某次裁剪后顶点数 $<3$，判定为\textbf{约束不相容}（例如方位矛盾），说明检测数据异常或源已被清除，该频道进入待复核队列。
+\end{enumerate}
+
+\noindent\textbf{算法 2（最小包围圆）} 本文用 Welzl 增量法（等价的三点/两点枚举实现）：直径圆的圆心取两个最远点中点，若不能覆盖全部顶点，则最优圆由三个顶点外接确定。该量用于回答问题一的"圆是否覆盖"。
+
+\subsection{"以定位区域直径为直径的圆"能否覆盖该区域}
+
+设 $AB$ 为 $\Reg$ 的一对直径端点（$\|A-B\|=D$），记 $\mathcal D$ 为以 $AB$ 为直径的圆。
+
+\begin{quote}
+\textbf{命题 1（Thales 判据）} 设 $\Reg$ 为凸集，$AB$ 为其直径。则
+\begin{equation}
+\Reg\subseteq\mathcal D
+\quad\Longleftrightarrow\quad
+\forall V\in\operatorname{ext}(\Reg):\ \angle AVB\ \ge\ 90^\circ .
+\label{eq:thales}
+\end{equation}
+\end{quote}
+
+\noindent\textbf{证明} 由 Thales 定理，$\mathcal D=\{Q:\angle AQB\ge90^\circ\}$，且 $\mathcal D$ 是凸集。若所有极点满足 $\angle AVB\ge90^\circ$，则它们都在 $\mathcal D$ 中；$\Reg=\conv(\operatorname{ext}\Reg)$ 且 $\mathcal D$ 凸，故 $\Reg\subseteq\mathcal D$。反之若某极点 $V\notin\mathcal D$ 即 $\angle AVB<90^\circ$，则 $V\in\Reg$ 但 $V\notin\mathcal D$，覆盖不成立。$\square$
+
+命题 1 给出一个 $O(n)$ 的\textbf{可判定判据}，同时说明问题一的答案是\textbf{"不必然覆盖"}：只要存在一个顶点使 $\angle AVB<90^\circ$ 即反例。
+
+\medskip
+\noindent\textbf{最坏情况有多坏？} 设 $R_{\MEC}$ 为 $\Reg$ 的最小包围圆半径。由 \textbf{Jung 定理}，对平面凸集
+\begin{equation}
+R_{\MEC}\ \le\ \frac{D}{\sqrt3}\ =\ 0.5774\,D
+\qquad\Longrightarrow\qquad
+\frac{R_{\MEC}}{D/2}\ \le\ \frac{2}{\sqrt3}=1.1547 .
+\label{eq:jung}
+\end{equation}
+即\textbf{最坏情况下直径圆要比"够用"的圆小 $15.47\%$}。这是一个\textbf{普适上界}，与观测点个数无关。
+
+\subsection{数值验证}
+
+\noindent\textbf{（1）算例}。取 $S_1=(0,0)$、$S_2=(1200,300)$，真源 $G=(900,800)$，两次方位由 $G$ 精确给出（示向度 $41.63^\circ$、$120.96^\circ$）。计算结果：
+
+\begin{center}
+\small
+\begin{tabular}{cccccc}
+\toprule
+直径 $D$ & 最小包围圆 $R_{\MEC}$ & $R_{\MEC}/(D/2)$ & 顶点数 & 最小张角 $\angle AVB$ & 判据 \\
+\midrule
+$50.88$ m & $25.44$ m & $1.0000$ & $4$ & $100.67^\circ$ & \textbf{成立} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+即此算例中 $\mathcal D$ 恰好覆盖 $\Reg$（$R_{\MEC}=D/2$），最小张角 $100.67^\circ\ge90^\circ$ 与命题 1 自洽。图~\ref{fig:q1} 左给出可行域、直径、直径圆与最小包围圆；右为逐顶点张角检验。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{B_fig1_q1_region.png}
+\caption{问题一算例：(a) 两次检测的 2$^\circ$ 楔形交会出的凸可行域、其直径 $D$、以 $D$ 为直径的圆与最小包围圆；(b) 按命题 1 逐顶点检验 $\angle AVB\ge90^\circ$}
+\label{fig:q1}
+\end{figure}
+
+\noindent\textbf{（2）最坏情况搜索}。对观测点个数 $m=2,3,4,5$ 各做 $4\times10^4$ 次随机构型抽样（首站置于原点，其余站方位 $U[0,2\pi)$、半径 $U[300,2800]$；源在半径 $1650$ m 内均匀；要求所有站与源距离不超过 $1500$ m 且不小于 $30$ m，即"全部站都测得到"），统计 $R_{\MEC}/(D/2)$：
+
+\begin{table}[H]
+\centering
+\caption{随机构型下 $R_{\MEC}/(D/2)$ 的实测分布（各 $4\times10^4$ 次抽样）}
+\label{tab:jung}
+\small
+\begin{tabular}{ccccc}
+\toprule
+观测点个数 $m$ & 有效样本 & 实测最大值 & 超出 $D/2$ 的最大幅度 & $99.9\%$ 分位 \\
+\midrule
+$2$ & $9\,598$  & $1.0148$ & $+1.48\%$ & $1.0030$ \\
+$3$ & $3\,934$  & $1.0941$ & $+9.41\%$ & $1.0255$ \\
+$4$ & $1\,572$  & $1.0674$ & $+6.74\%$ & $1.0283$ \\
+$5$ & $636$    & $1.0511$ & $+5.11\%$ & $1.0390$ \\
+\midrule
+\multicolumn{2}{c}{Jung 上界（与 $m$ 无关）} & $1.1547$ & $+15.47\%$ & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+最严重构型出现在 $m=3$：检测点 $(0,0)$、$(147.3,895.8)$、$(-572.7,-327.8)$，真源 $(-1149.6,959.5)$，此时 $D=56.0$ m、$R_{\MEC}=30.6$ m、比值 $1.0941$。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{B_fig2_q1_jung.png}
+\caption{问题一最坏情况：(a) $R_{\MEC}/(D/2)$ 的分布；(b) 实测最坏幅度随站数变化，均远低于 Jung 上界}
+\label{fig:jung}
+\end{figure}
+
+\noindent\textbf{结论}：
+\begin{enumerate}
+  \item 以定位区域直径为直径的圆\textbf{不必然}覆盖该区域；严格判据是命题 1 的 Thales 条件。
+  \item 但\textbf{实际中几乎总成立}：$2$ 站交会（题目图 2 的情形）最坏也只超出 $1.48\%$，$3\!\sim\!5$ 站最坏 $5\%\!\sim\!9\%$，全部远小于 Jung 上界 $15.47\%$。因此\textbf{在小概率极端几何下，用直径作"覆盖半径"会低估，工程上应改用 $R_{\MEC}$（或以 $D/\sqrt3$ 作保守设计值）}。
+  \item 站数 $m$ 越大，$R_{\MEC}/(D/2)$ 的分布反而略宽（因为可选构型更多），但有效样本数急剧下降——这意味着"多站同时可见"本身是稀缺事件，与问题四中"定向源常只有 1 站可见"的现象一致。
+\end{enumerate}
+
+\section{问题二：第二检测点的最优选择策略}
+
+\subsection{把"定位效果好"翻译成可优化的目标函数}
+
+由问题一，\textbf{定位精度就是可行域的直径 $\diam(\Reg)$}。选择第二检测点 $S_2$ 时，我们面对两个互相冲突的效应：
+
+\begin{itemize}
+  \item \textbf{效应 A（条件数）}：$S_2$ 离 $S_1$ 越远、与示向度夹角越大，两条方位线交会角越大，$\diam$ 越小；
+  \item \textbf{效应 B（接收保证）}：源距离 $d$ 未知，$S_2$ 一旦偏离示向度方向，就可能\textbf{收不到信号}——此时第二次检测\textbf{完全没有信息}，区域直径停留在仅一次测量的水平。
+\end{itemize}
+
+于是目标函数取"第二次测量后的期望直径"，并对"收不到"施以惩罚（惩罚值取仅一次方位时的不确定度上界 $R_{\max}=1500$ m）：
+
+\begin{equation}
+\boxed{\ \jj(S_2)=\underbrace{P_{\rm fail}(S_2)}_{\text{第二次无信号}}\cdot R_{\max}
+\ +\ \underbrace{\E\bigl[\diam(\Reg_2)\ \big|\ \text{成功}\bigr]}_{\text{成功时的期望直径}}\ }
+\label{eq:J}
+\end{equation}
+
+\subsection{源距离的先验分布}
+
+$S_1$ 能测到该源 $\Longrightarrow$ $d\le r_k$ 且 $d\ge5$。$r_k\sim U[1000,1500]$，故
+
+\begin{equation}
+P(r_k\ge d)=\begin{cases}1,& d\le1000,\\[2pt]
+\dfrac{1500-d}{500},& 1000<d<1500,\\[2pt] 0,& d\ge1500,\end{cases}
+\qquad
+\pi(d)\ \propto\ \underbrace{d}_{\text{面积元}}\cdot P(r_k\ge d),\quad d\in[5,1500].
+\label{eq:prior}
+\end{equation}
+
+\textbf{注意 $\pi(d)\propto d$ 这一点至关重要}：由于源在圆盘内均匀、半径大的圆环面积大，$d$ 的先验偏向大值（数值上 $\E[d]\approx855$ m）。这解释了为什么"保守地假设源就在附近"会导致完全错误的结论。
+
+\subsection{关键约束：保证接收}
+
+设 $S_1$ 至源的方向为 $\theta_1=0$（旋转不变性），$|S_1S_2|=\rho$，$S_2$ 相对示向度的偏角为 $\alpha$。要\textbf{保证}（对最不利的 $r_k=1000$ m 也成立）$S_2$ 能收到该源，需
+
+\begin{equation}
+\begin{aligned}
+|S_2G|^2&=\rho^2-2\rho d\cos\alpha+d^2\ \le\ r_{\min}^2=1000^2\\
+&\Longleftarrow\quad
+\rho\in\Bigl[d\cos\alpha-\sqrt{r_{\min}^2-d^2\sin^2\alpha},\ d\cos\alpha+\sqrt{r_{\min}^2-d^2\sin^2\alpha}\Bigr].
+\end{aligned}
+\end{equation}
+
+该区间存在当且仅当 $d|\sin\alpha|\le r_{\min}$，即
+
+\begin{equation}
+\boxed{\ |\alpha|\ \le\ \alpha_{\max}(d)\ :=\ \arcsin\!\bigl(r_{\min}/d\bigr)\ }
+\label{eq:alphamax}
+\end{equation}
+
+\textbf{对偶形式（图~\ref{fig:q2}(a) 所绘）}：若反过来固定第二点距离 $\rho$、只让源距 $d$ 变化，则同一二次式的判别式给出的条件是把 $d$ 与 $\rho$ 互换，即存在能（在最不利的 $r_k=r_{\min}$ 下）被 $S_2$ 接收的源距当且仅当 $\rho|\sin\alpha|\le r_{\min}$：
+
+\begin{equation}
+\boxed{\ |\alpha|\ \le\ \arcsin\!\bigl(r_{\min}/\rho\bigr)\ }
+\label{eq:dualbound}
+\end{equation}
+
+这在 $(\rho,\alpha)$ 平面上给出"保证接收"的可行边界——因为 $|S_2G|^2$ 对 $d$ 取极小值为 $\rho^2\sin^2\alpha$，故 $\rho\sin\alpha>r_{\min}$ 的方案无论真实源落在哪个半径上、$S_2$ 都收不到信号。这也解释了图~\ref{fig:q2}(a) 的机理：$\rho$ 越大，允许的偏角越小，可行域是一条向原点张开的楔形。
+
+数值上：$d\le r_{\min}=1000$ m 时 $\alpha_{\max}\ge90^\circ$（此时任意偏角都有某个 $\rho$ 能保证收到）；$d$ 越大约束越紧，$d=1200$ m 时 $\alpha_{\max}=56.4^\circ$，$d=1300$ m 时 $50.3^\circ$，\textbf{当 $d\to1500$ m 时收敛到 $\arcsin(1000/1500)=41.8^\circ$}。\textbf{要害在于}：\textbf{纯侧移（$\alpha$ 接近 $90^\circ$）在几何上不可能收到远端源，其 $P_{\rm fail}$ 必然很大}，而由式~\eqref{eq:prior}，源恰有相当概率落在 $1300\!\sim\!1500$ m 的远端环带。
+
+\subsection{数值求解与最优解}
+
+对 $\rho\in[100,2800]$ m、$\alpha\in[0^\circ,180^\circ]$ 做 $100\times121$ 网格搜索，每次用两射线求交得到四边形的直径（射线求交必须\textbf{同时校验两个参数为非负}，否则会把反向延长线的虚交点算进来），结果：
+
+\begin{equation}
+\boxed{\ \alpha^*=31.5^\circ,\qquad \rho^*=1054\ \text{m},\qquad \jj^*=50.3\ \text{m}\ }
+\end{equation}
+
+$\jj\le1.05\jj^*$ 的候选带为 $|S_1S_2|\in[970,1150]$ m、$|\alpha|\in[25^\circ,40^\circ]$（左右镜像等价）。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{B_fig3_q2_design.png}
+\caption{问题二：(a) 目标函数 $J(\rho,\alpha)$ 等值线，叠加保证接收的对偶边界 $|\alpha|\le\arcsin(1000/\rho)$ 与两个直觉解；(b) 各偏角下的权衡曲线（对数轴），$\alpha^*=31.5^\circ$ 附近有明确谷底}
+\label{fig:q2}
+\end{figure}
+
+\subsection{两个必须澄清的反直觉结论}
+
+\noindent\textbf{（1）"垂直 $90^\circ$"是错的。} 直觉上基线越宽越好，于是取 $\alpha=90^\circ$。但在 $d$ 的先验下：
+
+\begin{center}
+\small
+\begin{tabular}{lccc}
+\toprule
+方案 & $P_{\rm fail}$ & 成功时平均直径 & $\jj$ \\
+\midrule
+垂直 $90^\circ$、$\rho=1000$ m & $0.633$ & --- & $973.3$ m \\
+垂直 $90^\circ$、$\rho=1500$ m & $1.000$ & --- & $1500.0$ m \\
+沿示向度直走 $\rho=1250$ m & $0.006$ & $1268$ m & $1280.2$ m \\
+偏 $45^\circ$、$\rho=800$ m & $0.001$ & $62.7$ m & $63.9$ m \\
+\textbf{最优：偏 $31.5^\circ$、$\rho=1054$ m} & $\mathbf{0.000}$ & $\mathbf{50.3}$ m & $\mathbf{50.3}$ m \\
+偏 $20^\circ$、$\rho=1200$ m & $0.004$ & $64.4$ m & $64.6$ m \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+$\alpha=90^\circ$ 时 $\rho=1000$ m 有 $63.3\%$ 的概率收不到信号（$\rho=1500$ m 时必失败），$J$ 高达 $973$ m，\textbf{是最优解的 $19$ 倍}。根因就是式~\eqref{eq:alphamax}。
+
+\noindent\textbf{（2）"沿示向度方向直走"也是错的。} 此时两次观测点与源\textbf{近乎共线}，两条方位线几乎重合，交会角趋近 $0$，区域\emph{不收缩}：虽然几乎总能收到信号（$P_{\rm fail}=0.6\%$），但成功时直径仍有 $1268$ m，$\jj=1280$ m，\textbf{是最优解的 $25$ 倍}。
+
+\noindent\textbf{（3）最优解的物理解释}：$\alpha^*\approx30^\circ$ 恰是"用尽量大的交会角换取尽量高的接收概率"的折中点；$\rho^*\approx1054$ m 则约为 $r_{\min}=1000$ m 的量级——再远则超出有效接收半径的风险上升，再近则交会基线太短、$\diam\propto d\,\delta\theta/\sin(\angle)$ 的误差放大因子变大。
+
+\subsection{可直接执行的选择策略}
+
+\begin{quote}
+\textbf{策略 Q2}（设第一观测点 $S_1$、测得示向度 $\theta_1$）：
+\begin{enumerate}
+  \item 沿 $\theta_1$ 取 $S_1$ 前方 $R_{\text{aux}}=1000$ m 处的参考点 $C=S_1+1000(\cos\theta_1,\sin\theta_1)$（即承诺区域质心的近似）；
+  \item 取第二观测点
+  \begin{equation}
+  S_2=C+\rho^*\Bigl(\cos(\theta_1\pm\alpha^*),\ \sin(\theta_1\pm\alpha^*)\Bigr),\quad
+  \rho^*=1050\ \text{m},\ \alpha^*=30^\circ,
+  \end{equation}
+  符号取使 $S_2$ 仍落在目标区域（或合法坐标域）内的一侧；两侧均合法时任取一侧；
+  \item 若 $S_2$ 处返回 \texttt{no\_signal}，\textbf{不要}沿示向度方向试探，而是\textbf{镜像到另一侧} $-\alpha^*$ 补测一次（因 $\varphi$ 先验均匀，阴影侧等概率，镜像的成功率约为 $50\%\to$ 显著改善）；
+  \item 若两侧均无信号，退化为"径向前进"策略：把 $S_2$ 沿 $\theta_1$ 推进到 $1300\!\sim\!1500$ m 处再测（牺牲条件数换接收率），并同时在\textbf{反方向}（$\theta_1+180^\circ$）测一次以排除方位翻转。
+\end{enumerate}
+\end{quote}
+
+该策略在问题三中被直接实现为"主动定位点"子算法（第~\ref{sec:q3} 节），并在问题四中被进一步修正为"中等深度双向探测"（第~\ref{sec:q4} 节）。

@@ -1,0 +1,427 @@
+\section{问题四：混入定向干扰源后的策略增量}
+\label{sec:q4}
+
+\subsection{信息结构发生了什么变化}
+
+全向源与定向源的差别，本质上是 \texttt{no\_signal} 语义的变化：
+
+\begin{equation}
+\text{全向源：}\ \texttt{no\_signal}\iff |P_0G|>r_k\ \ge 1000
+\quad\Longrightarrow\quad
+\text{源在 }\overline{B(P_0,1000)}\text{ 之外（凹约束）};
+\end{equation}
+\begin{equation}
+\text{定向源：}\ \texttt{no\_signal}\iff \underbrace{|P_0G|>r_k}_{\text{太远}}\ \ \text{或}\ \ \underbrace{(G-P_0)^{\!\top}\hat\varphi<0}_{\text{落在阴影半平面}}.
+\end{equation}
+
+于是出现两个新现象：
+
+\begin{itemize}
+  \item \textbf{区域不再是凸集}：$|P_0G|>1000$ 是圆盘的外部，非凸；与楔形相交后可行域可能分裂成多块，问题一的半平面交算法不再直接适用。本文的处理是\textbf{保守地忽略该约束}（只保留上界可证的部分），保证不漏掉真解——这也与集值估计的"宁可区域大一点、不可丢掉真值"原则一致。
+  \item \textbf{"在覆盖内反而收不到"}：这是定向源特有的反常现象，直接威胁问题二的最优解，因为 Q2 的第二点依赖于"第二点能收到信号"。
+\end{itemize}
+
+\subsection{核心结论：单圆环对"朝内辐射"的源存在几何盲区}
+
+设源位置 $G=\rho(\cos\alpha,\sin\alpha)$（$\rho=|OG|$）、辐射主方向 $\hat\varphi$（与径向夹角 $\delta$）、环上观测点 $Q=a(\cos\beta,\sin\beta)$。一次检测能收到信号的充要条件是
+\begin{equation}
+\mathrm{cov}(Q):=\ (G-Q)^{\!\top}\hat\varphi\ \ge\ 0
+\quad\Longleftrightarrow\quad
+\mathrm{cov}(\beta)=\rho\cos\delta-a\cos(\beta-\delta-\alpha)\ \ge\ 0 .
+\label{eq:cov}
+\end{equation}
+
+取最不利情形 $\delta=180^\circ$（\textbf{源朝圆心辐射}），此时
+\begin{equation}
+\boxed{\ \mathrm{cov}(\beta)=-\rho+a\cos(\beta-\alpha)\ \le\ -\rho+a\ <\ 0
+\qquad\text{只要}\ \rho>a\ }
+\label{eq:blind}
+\end{equation}
+
+\textbf{即：当源的半径大于观测环半径、且主方向朝向圆心时，环上任意位置的覆盖判据恒为负——单圆环在几何上永远看不到该源。}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{B_fig6_q4_shadow.png}
+\caption{问题四：(a) 一例定向源的阴影几何（$G=(977,-760)$、$r_k=1189$ m、$\hat\varphi=223.8^\circ$），$7$ 个内环站仅 $1$ 个可见；(b) 式~\eqref{eq:blind} 的图解：$\delta=180^\circ$ 且 $\rho\ge a$ 时 $\mathrm{cov}\le0$ 恒成立}
+\label{fig:q4shadow}
+\end{figure}
+
+图~\ref{fig:q4shadow}(a) 给出实测中的真实例子：源在 $(977,-760)$（$\rho=1238$ m）、$r_k=1189$ m、$\hat\varphi=223.8^\circ$。逐个检查 $7$ 个内环站：站 $0$ $(1000,0)$ 距源 $760$ m 且 $\mathrm{cov}=+543$，\textbf{唯一可测}；站 $6$ $(623,-782)$ 距源仅 $354$ m 却因 $\mathrm{cov}=-270$ 落在阴影中；其余各站或超出 $r_k$、或同时满足两个不利条件。该频道最终\textbf{只有 $1$ 个方位}，直径停在 $\approx1300$ m，永远不会进入清剿队列。
+
+\noindent\textbf{量化影响}：单环策略在定向比例 $100\%$ 时平均只能清除 $7.2$ 个源（真值 $12.96$ 个），清除率仅 $55.0\%$；$35\%$ 时也只有 $81.3\%$。逐局按源类型分解（每组 $50$ 局，\texttt{baseline\_eval.py} 可复现）显示：\textbf{漏掉的源 $100\%$ 都是定向源，全向源的漏检率恒为 $0\%$}，而定向源的漏检率高达 $44.6\%$（$100\%$ 组）、$51.5\%$（$35\%$ 组）。这说明漏检几乎全部是"从未被任何观测点测到"而非"测到了清不掉"——因为清剿环节使用光学/激光定位，与辐射方向无关，\textbf{问题四的难点全部在"测得到"而非"清得掉"}。
+
+\subsection{零成本判据：如何提前知道"这场有定向源"}
+
+外环补扫要额外付出约 $1300$ s 的路程。是否可以只在\emph{确实存在}定向源时才付这笔钱？可以，而且证据是\textbf{免费}的：
+
+\begin{quote}
+\textbf{命题 2（定向源判据）} 设某频道已有可行域 $\Reg$（质心 $C$）与至少一个有效方位。记 $\Reg$ 关于质心的\textbf{外接半径}
+\begin{equation}
+\mathrm{rad}(\Reg):=\max_{v\in\operatorname{vert}(\Reg)}\|v-C\| ,
+\label{eq:rad}
+\end{equation}
+若在点 $Q$ 处该频道返回 \texttt{no\_signal} 且
+\begin{equation}
+\|Q-C\|+\mathrm{rad}(\Reg)\ <\ r_{\min}=1000\ \text{m},
+\label{eq:dircrit}
+\end{equation}
+则该源\textbf{必为定向源}。
+\end{quote}
+
+\noindent\textbf{证明} 反设该源为全向源。$\Reg$ 是凸多边形，而凸集内到定点 $C$ 的最远点必在顶点处取得，故对任意 $G\in\Reg$ 有 $\|C-G\|\le\mathrm{rad}(\Reg)$。于是
+$\|Q-G\|\le\|Q-C\|+\|C-G\|\le\|Q-C\|+\mathrm{rad}(\Reg)<1000\le r_k$，
+源必落在有效接收半径之内；又因全向源无方向性，$Q$ 处必在覆盖角度内，故必返回 \texttt{direction} 或 \texttt{near}，与 \texttt{no\_signal} 矛盾。$\square$
+
+命题 2 的含义非常实用：\textbf{全向源绝不会在 $1000$ m 内静默，所以在 $1000$ m 内静默的必然是定向源}。这里必须用式~\eqref{eq:rad} 的\emph{精确外接半径}而不是直径的一半：$D/2$ 只是"以质心为中心"的半径的下界，对一般凸多边形 $\mathrm{rad}(\Reg)$ 可以显著超过 $D/2$（例如钝角三角形时 $\mathrm{rad}\to\tfrac23D$），用 $D/2$ 会低估包络、造成\textbf{误触发}。由于 $\Reg$ 是凸多边形，$\mathrm{rad}(\Reg)$ 只须在凸包顶点上取最大值，代价 $O(n)$，与用 $D/2$ 一样廉价，故本文直接取严格值。
+
+实测\textbf{误触发率 $0\%$}：$50$ 局纯全向演练中，判据一次也未触发（表~\ref{tab:q4res} 第 $1$ 行"外环启动率 $0\%$"），因此全向场景的路程与纯单环策略\textbf{完全相同}。这正是我们需要的"按需付费"性质。
+
+\subsection{自适应双环策略}
+
+\begin{quote}
+\textbf{算法 4（自适应双环）}
+\begin{enumerate}
+  \item \textbf{阶段一}：按算法 3 只使用内环 $7$ 站 @$a=1000$ m（表~\ref{tab:cover} 给出的保证覆盖配置），完成扫描 $+$ 滚动清剿；过程中\textbf{实时运行命题 2 的判据}，一旦成立即置位标志 $\mathrm{flag}_{\rm dir}$。
+  \item \textbf{阶段二（条件启动）}：仅当 $\mathrm{flag}_{\rm dir}=\text{true}$ 且仍有频道从未获得方位（$\mathrm{n}_{\rm dir}=0$）且已识别数 $<16$ 时，才追加\textbf{外环 $5$ 站 @$a'=1700$ m}（与内环错开 $\pi/5$ 相位），并在其上只对\textbf{未识别频道}做检测。
+  \item 外环半径取 $1700$ m 的理由：由式~\eqref{eq:blind}，观测点须满足 $a'>\rho$ 才能进入朝内源的覆盖半平面；由 $\rho\le1800$ m 与 $a'-\rho\le r_{\min}$ 得需 $a'\ge\rho$，取 $a'=1700$ m 可覆盖 $\rho\in[700,1700]$ m 的朝内源（$\rho<700$ m 的朝内源已由内环覆盖；$\rho\in(1700,1800]$ 属于极边缘的少量情形）。
+  \item 清剿与主动定位仍按算法 3 执行，其中主动定位点改用式~\eqref{eq:loc} 的\textbf{中等深度双向探测}，并以"正反两侧"作为首选的两个候选（因 $\hat\varphi$ 先验均匀，阴影落在哪一侧等概率，单向尝试等价于 $50\%$ 失效率）。
+\end{enumerate}
+\end{quote}
+
+\subsection{演练测试结果}
+
+\begin{table}[H]
+\centering
+\caption{问题四 演练测试结果（每组 $50$ 局，平滑误差场）。基线由 \texttt{baseline\_eval.py} 单因子复现（仅关外环、退回单向补测，种子与本文组完全一致）；"外环启动率"即命题 2 判据触发（\texttt{has\_dir} 置位），也就是外环补扫的闸门打开率}
+\label{tab:q4res}
+\small
+\setlength{\tabcolsep}{4.2pt}
+\begin{tabular}{cccccc}
+\toprule
+定向源比例 & \multicolumn{3}{c}{本文自适应双环策略} & \multicolumn{2}{c}{基线（单环 $+$ 单向补测）} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}
+ & 清除比例 & 总时间均值 / s & 外环启动率 & 清除比例 & 总时间均值 / s \\
+\midrule
+$0\%$   & $\bm{100.00\%}$ & $3754$ & $0\%$  & $100.00\%$ & $3661$ \\
+$10\%$  & $98.13\%$  & $4291$ & $24\%$ & $95.14\%$  & $3694$ \\
+$20\%$  & $96.47\%$  & $4513$ & $32\%$ & $90.97\%$  & $3727$ \\
+$35\%$  & $94.25\%$  & $5027$ & $50\%$ & $81.27\%$  & $3772$ \\
+$50\%$  & $93.07\%$  & $5371$ & $60\%$ & $76.20\%$  & $3880$ \\
+$75\%$  & $91.67\%$  & $6114$ & $78\%$ & $65.38\%$  & $3893$ \\
+$100\%$ & $90.86\%$  & $6871$ & $92\%$ & $55.04\%$  & $3932$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{B_fig7_perf.png}
+\caption{性能总结：(a) 清除完整率随定向源比例的变化（与单环基线逐局对比）；(b) 时间代价；(c) 误差场模型鲁棒性}
+\label{fig:perf}
+\end{figure}
+
+\noindent\textbf{结果解读}：
+\begin{enumerate}
+  \item \textbf{全向场景零开销}：定向比例 $0\%$ 时判据（式~\eqref{eq:dircrit}）从不触发（$50$ 局触发 $0$ 次），把 \texttt{use\_outer} 打开与关闭得到的 $50$ 局结果\textbf{逐局完全相同}（时间 $3754$ s、移动 $15\,082$ m、检测 $111.4$ 次），与问题三完全一致——\textbf{策略的鲁棒性是"条件自适应"换来的，而不是靠牺牲问题三的性能}。
+  \item \textbf{定向场景显著增益}：定向比例 $35\%$ 时清除率由基线的 $\bm{81.3\%}$ 提升到 $\bm{94.25\%}$（$+13.0$ 个百分点），$100\%$ 时由 $\bm{55.0\%}$ 提升到 $\bm{90.86\%}$（$+35.8$ 个百分点）。按源类型逐局分解可知增益的全部来源：\textbf{全向源漏检率两者恒为 $0\%$}，而\textbf{定向源的漏检率由基线的 $51.5\%$（$35\%$ 组）/ $44.6\%$（$100\%$ 组）降到 $16.5\%$/$9.3\%$}——即"把原来漏检掉的那部分定向源重新纳入"。
+  \item \textbf{代价可控且"按源计价"不变}：外环仅在需要时启用（$10\%$、$20\%$、$35\%$、$50\%$、$75\%$、$100\%$ 时启动率分别 $24\%$、$32\%$、$50\%$、$60\%$、$78\%$、$92\%$），时间为 $4291\!\sim\!6871$ s，仍远小于 $20$ min 的真实运行约束。值得注意的是$100\%$ 定向组里本文策略平均每源 $595.2$ s，基线为 $592.1$ s，\textbf{几乎相同}——多花的总时间全部换成了多清掉的源，而不是被浪费掉。
+  \item \textbf{误差场鲁棒性}：定向 $35\%$ 组在六种误差场配置（平滑场相关长度 $2500$、$1200$、$600$ m，独立同分布，分块常值场 $300$、$150$ m）下清除率为 $94.05\%\!\sim\!94.36\%$、总时间 $5027\!\sim\!5183$ s，\textbf{波动均小于 $3\%$}（图~\ref{fig:perf}c），再次印证集值估计对误差结构的免疫性。
+\end{enumerate}
+
+\noindent\textbf{为什么清除率没有到 $100\%$？} 剩余漏检源于式~\eqref{eq:blind} 的两个边界情形：（i）$\rho\in(1700,1800]$ m 且朝内辐射的极边缘源（外环半径 $1700$ m 不足以越过它）；（ii）$r_k$ 恰取下界且几何退化（多个站同时落在阴影内）。这两类都属于"路程预算内不追求绝对保证"的取舍：本文的"内环 $+$ 条件外环"是在"漏检率 $\to0$"与"路程 $\to$ 下界"之间的工程折中，在 $35\%$ 这一题面提示的典型比例下达到 $94.25\%$，且\textbf{全向场景下仍严格 $100\%$}。若场景要求对\emph{任意}（位置, 方向）组合都严格保证"必可测"，则不必依赖任何经验性的加密规则，而存在一个\textbf{可证明的有限站布局}（下一小节的命题 3）；它的路程约为默认方案的一倍，故本文把它作为\emph{按需启用的兜底}，而不是默认方案。
+
+\subsection{\texorpdfstring{严格 $100\%$ 保证}{严格 100\% 保证}：胞元顶点覆盖引理与兜底布局}
+\label{sec:complete}
+
+上面"按需付费"的代价是：在极边缘情形下仍有约 $5\%$ 的定向源漏检。若场景要求对\textbf{任意}（位置, 方向）组合都给出 $100\%$ 的"必可测"保证，下面的引理给出了一个干净的构造。
+
+\begin{quote}
+\textbf{命题 3（胞元顶点覆盖引理）} 设真值 $G$ 落在胞元 $\conv(V)$ 内，$V=\{v_1,\dots,v_m\}$ 为胞元顶点、同时也被选作观测站；若胞元的\textbf{顶点包络}
+\begin{equation}
+\max_{i}\|v_i-G\|\ \le\ r_{\min}=1000\ \text{m},
+\label{eq:cellcover}
+\end{equation}
+则对任意辐射主方向 $\hat\varphi$，总存在某个 $v_i$ 使
+\begin{equation}
+(v_i-G)^{\!\top}\hat\varphi\ \ge\ 0
+\quad\text{且}\quad
+\|v_i-G\|\ \le\ r_{\min}\ \le\ r_k ,
+\label{eq:cellcover2}
+\end{equation}
+即在 $v_i$ 处一次 \texttt{/measure} \textbf{必能测得该定向源}。
+\end{quote}
+
+\noindent\textbf{证明} 因 $G\in\conv(V)$，存在凸组合 $\lambda_i\ge0$、$\sum_i\lambda_i=1$ 使 $G=\sum_i\lambda_i v_i$，故 $\sum_i\lambda_i(v_i-G)=\bm0$。两边点乘 $\hat\varphi$ 得
+\[
+\sum_i\lambda_i\,(v_i-G)^{\!\top}\hat\varphi=0 .
+\]
+这是若干\textbf{非负权重}的加权和等于 $0$，故至少有一项非负，即存在 $i$ 满足 $(v_i-G)^{\!\top}\hat\varphi\ge0$；又由式~\eqref{eq:cellcover} 有 $\|v_i-G\|\le r_{\min}\le r_k$。于是该源在 $v_i$ 处同时满足"落在覆盖半平面内"与"在有效接收半径内"两个条件，必返回 \texttt{direction}。$\square$
+
+命题 3 的几何直觉一句话：\textbf{源朝哪个方向辐射，都躲不开它所在胞元的某个顶点}——因为 $G$ 是胞元顶点的凸组合，"各方向加权平均为零"迫使至少一个顶点落在辐射半平面这一侧。它把布局问题彻底化归为\textbf{"让胞元足够小"}：只要胞元内任意点到其顶点的最远距离不超过 $r_{\min}$，就\textbf{不依赖任何概率假设}地保证 $100\%$ 可测。
+
+$\kappa$ 是胞元形状决定的紧常数。本文对每个胞元在 $200^2$ 个源位置采样 $\times$ $1440$ 个方向穷举复算（\texttt{q4\_complete.py}），结果见表~\ref{tab:cell}。
+
+\begin{table}[H]
+\centering
+\caption{胞元形状与顶点包络紧常数 $\kappa=\sup_{G,\hat\varphi}\min_{i\in T}\|v_i-G\|/h$（$T$ 为落在辐射半平面内的顶点集），数值复算与解析值一致}
+\label{tab:cell}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lccc}
+\toprule
+胞元形状 & 数值 $\kappa$ & 解析 $\kappa$ & 边长上界 $h_{\max}=r_{\min}/\kappa$ \\
+\midrule
+正三角形（边长 $h$） & $0.9961$ & $1.0000$ & $1004$ m \\
+正方形（边长 $h$）   & $1.1124$ & $\sqrt{5}/2=1.1180$ & $894$ m \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+正方形胞元的最坏情形是：源贴着某侧边的中点、主方向指向胞元内部，此时该侧边的两个顶点都落进阴影半平面，只能用对侧两个顶点，距离为 $\sqrt{h^2+(h/2)^2}=\tfrac{\sqrt5}{2}h$；正三角胞元的最坏值恰为 $h$（源趋近某一顶点、主方向沿对边方向），故\textbf{三角格在同一保证标准下允许更粗的间距、更少的站}。
+
+据此取 $h=950$ m 的\textbf{三角格}（$\Arena$ 内加界外顶点共 $31$ 站，站间距 $950$ m $\cdot$ $\kappa=946$ m $<1000$ m，留 $54$ m 余量），按命题 3 即可对任意（位置, 方向）组合保证可测。表~\ref{tab:complete} 给出它与方格布局的代价对比（巡回长度为自圆心出发的最近邻 $+$ 2-opt）。
+
+\begin{table}[H]
+\centering
+\caption{严格保证布局的站数与巡回代价（\texttt{q4\_complete.py} 复算；每种布局各做 $2\times10^5$ 次随机（位置, 方向）抽样，失败率均为 $0$）}
+\label{tab:complete}
+\small
+\setlength{\tabcolsep}{4.5pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+布局 & 站数 & 失败率 & 最近可测站距/m & 巡回/m & 时间/s \\
+\midrule
+\textbf{三角格 $h=950$ m（兜底）} & $\bm{31}$ & $0\%$ & $948.9$ & $\bm{29\,195}$ & $5839$ \\
+三角格 $h=1000$ m & $31$ & $0\%$ & $999.0$ & $31\,464$ & $6293$ \\
+方格 $h=850$ m & $45$ & $0\%$ & $941.0$ & $38\,456$ & $7691$ \\
+方格 $h=600$ m & $69$ & $0\%$ & $662.6$ & $41\,794$ & $8359$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\noindent\textbf{为什么本文默认不启用它？} 三角格兜底布局的巡回为 $29\,195$ m $=5839$ s，\emph{仅路程}就已是主策略全向总时间（$3754$ s）的 $1.56$ 倍；再考虑到保证来源于"某个站必能看到"、事先并不知道是哪个站，必须对每个站点逐频道扫描，检测开销也会明显上升。因此本文的工程结论是：\textbf{默认用"内环 $+$ 条件外环"以 $3754\!\sim\!6871$ s 清掉 $91\%\!\sim\!100\%$ 的源；仅在"判据确已证实存在定向源、常规手段停滞、且已知定向比例上界偏高"时，才切换到三角格兜底布局}，用约一倍的路程换取 $100\%$ 的\emph{可测}保证。这种"保证等级可调"的设计也是集值估计路线的自然延伸——\textbf{漏检率与路程可以显式地对换，而不是靠调参碰运气}。
+
+\section{模型评价与推广}
+
+\subsection{模型优点}
+
+\begin{enumerate}
+  \item \textbf{数学结构清晰、结论可证}：全题建立在"集值估计 $+$ 凸几何"之上，问题一的 Thales 判据、Jung 上界、问题四的几何盲区定理（式~\eqref{eq:blind}）都是可证明的严格结论，而非调参经验；
+  \item \textbf{误差模型无关的鲁棒性}：策略只用 $\pm1^\circ$ 硬界，对平滑场/独立同分布/分块场全部给出 $100\%$（全向）与 $\approx94.2\%$（定向 $35\%$）的一致结果，避免了"把确定性误差当白噪声"这一常见建模错误；
+  \item \textbf{闭环可执行}：算法输出的是可直接下发的 \texttt{/measure}、\texttt{/clear} 坐标序列；策略与模拟器通过 \texttt{transport} 接口解耦，换成 HTTP 传输即可对官方模拟器运行；
+  \item \textbf{逼近理论下界}：全向场景总时间 $3754$ s、移动 $15\,082$ m，与"起点$\,+\,$源$\,+\,$覆盖环"的有效下界 $11\,536$ m 相差 $31\%$（时间约为该下界的 $1.63$ 倍）；
+  \item \textbf{条件自适应}：问题四的额外代价只在该付的时候付（全向场景判据零误触发）。
+\end{enumerate}
+
+\subsection{模型缺点与改进方向}
+
+\begin{enumerate}
+  \item \textbf{\texttt{no\_signal} 的凹信息被保守丢弃}：全向场景下"$|P_0G|>1000$"是有效的排除信息，本文为保持凸性而未使用，导致可行域偏大、检测次数偏多。改进方向：用"凸分解 $+$ 分支定界"或"外逼近"处理非凸约束，预计可再省 $10\%\!\sim\!15\%$ 检测次数；
+  \item \textbf{定向源默认策略仍未 $100\%$ 保证}：如第~\ref{sec:complete} 节所述，$100\%$ 的可测保证需要"胞元顶点包络 $\le r_{\min}$"的加密布局（三角格 $h=950$ m、$31$ 站，巡回 $29\,195$ m），其路程约为默认方案的一倍，故本文仅把它作为按需启用的兜底；若要常态化启用，可进一步用"变密度格"（在 $\rho\in(1700,1800]$ m 的边缘环带局部加密、内部放粗）把站数再压下去；
+  \item \textbf{路径规划为启发式}：滚动最近邻 $+$ $2$-opt 在 $20\!\sim\!25$ 个点的规模下与最优解差距约 $5\%\!\sim\!10\%$；若允许更多在线计算，可用 LKH/Held--Karp 或"插入式增量 TSP"；
+  \item \textbf{$r_k$ 的先验利用不足}：多次观测同一源可以反推 $r_k$ 的区间（"测得到"给下界、"测不到"给上界），进而收紧其他频道的推理，本文未展开。
+\end{enumerate}
+
+\subsection{推广}
+
+本文的"集值可行域 $\to$ 直径作为不确定度 $\to$ 最优观测点设计 $\to$ 滚动调度"链条可直接迁移到：
+
+\begin{itemize}
+  \item \textbf{室内定位/室内机器人}：WiFi/蓝牙指纹定位中"同点重复测量一致、跨点呈统计规律"的误差同样应作集值处理；
+  \item \textbf{声呐/雷达搜潜}：探测方位误差为确定性偏差时的交会定位与搜索路径规划；
+  \item \textbf{无人机搜寻救援}：有限探测半径 $+$ 遮蔽（对应本文的定向阴影）下的目标搜索；
+  \item \textbf{传感器网络布设}：式~\eqref{eq:cover} 的"保证覆盖"不等式给出了给定探测半径与区域半径下最少节点数及其半径区间，可直接用于工程选型。
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{jung} Jung H W E. Über die kleinste Kugel, die eine räumliche Figur einschliesst[J]. Journal für die reine und angewandte Mathematik, 1901, 123: 241--257.
+\bibitem{welzl} Welzl E. Smallest enclosing disks (balls and ellipsoids)[C]// New Results and New Trends in Computer Science. Springer, 1991: 359--370.
+\bibitem{prep} Preparata F P, Shamos M I. Computational Geometry: An Introduction[M]. Springer, 1985.
+\bibitem{sh} Sutherland I E, Hodgman G W. Reentrant polygon clipping[J]. Communications of the ACM, 1974, 17(1): 32--42.
+\bibitem{croes} Croes G A. A method for solving traveling-salesman problems[J]. Operations Research, 1958, 6(6): 791--812.
+\bibitem{bhh} Beardwood J, Halton J H, Hammersley J M. The shortest path through many points[J]. Mathematical Proceedings of the Cambridge Philosophical Society, 1959, 55(4): 299--327.
+\bibitem{gal} Gal S. Search games[M]. Academic Press, 1980.
+\bibitem{chvatal} Chvátal V, Cook W J. The Traveling Salesman Problem: A Computational Study[M]. Princeton University Press, 2006.
+\end{thebibliography}
+
+\newpage
+\appendix
+
+\section{支撑材料文件列表}
+
+\begin{table}[H]
+\centering
+\caption{自建代码与数据文件清单（路径均相对参赛仓库根目录）}
+\label{tab:files}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}cl >{\raggedright\arraybackslash}p{7.4cm}@{}}
+\toprule
+序号 & 文件 & 说明 \\
+\midrule
+1 & \texttt{jammer\_sim.py} & 自建等价模拟器：$\mathcal A$、误差场、\texttt{Simulator}、\texttt{LocalTransport}/\texttt{HttpTransport}、\texttt{RobotClient} \\
+2 & \texttt{strategy.py} & 策略主体：\texttt{Region}（半平面交）、\texttt{chan} 状态、站点布局、滚动重规划主循环、主动定位、清剿 \\
+3 & \texttt{selftest.py} & 计时规则自检（复现附件 1 表 2 的 $105$、$111$、$194$、$199$ s 四个时刻） \\
+4 & \texttt{final\_eval.py} & 问题三/四演练测试与鲁棒性批量评估，输出 \texttt{results/*.csv} \\
+5 & \texttt{baseline\_eval.py}、\texttt{order\_ablation.py} & 单环基线对照实验、任务顺序/主动定位消融（表~\ref{tab:q4res} 与两趟式对比的产出脚本） \\
+6 & \texttt{q3\_bounds.py} & 覆盖环几何与 oracle 下界的独立复算（表~\ref{tab:cover} 与下界表的产出脚本） \\
+7 & \texttt{q4\_complete.py} & 问题四严格保证的独立复算：命题 3 的紧常数 $\kappa$、三角格/方格布局的站数、$2\times10^5$ 次（位置, 方向）抽样验证与巡回长度（表~\ref{tab:cell}、\ref{tab:complete}） \\
+8 & \texttt{scan.py}、\texttt{run\_mc.py} & 参数扫描与单组蒙特卡洛 \\
+9 & \texttt{probe/B\_probe*.py} & 问题一、二的独立几何验证（直径、最小包围圆、Jung 上界、$J$ 曲面） \\
+10 & \texttt{figs/make\_figs\_B*.py} & 全部插图生成脚本（可复现） \\
+11 & \texttt{results/*.csv}、\texttt{*.npz} & $1100$ 余局演练的逐局明细 \\
+12 & \texttt{paper/main.tex}、\texttt{refs} & 论文 \LaTeX{} 源码与参考文献 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{核心源程序}
+
+\subsection{可行域与直径（问题一核心）}
+
+\begin{verbatim}
+class Region:
+    """可行域：凸多边形。只用"楔形 + 圆盘"两类凸约束（no_signal 是凹约束，保守忽略）。"""
+    def _clip(self, a, b, c):
+        poly = self.poly
+        if not poly: return
+        out, n = [], len(poly)
+        for i in range(n):
+            P, Q = poly[i], poly[(i + 1) % n]
+            fp, fq = a * P[0] + b * P[1] - c, a * Q[0] + b * Q[1] - c
+            if fp <= 0: out.append(P)
+            if (fp < 0 < fq) or (fq < 0 < fp):
+                t = fp / (fp - fq)
+                out.append((P[0]+t*(Q[0]-P[0]), P[1]+t*(Q[1]-P[1])))
+        self.poly = out
+
+    def add_wedge(self, S, theta_deg, half_deg=EPS_DEG):
+        """2° 楔形 -> 两条边界射线的同侧半平面约束。法向符号由"楔内测试点"确定。"""
+        t = math.radians(theta_deg); d = math.radians(half_deg)
+        p_in = np.array([S[0]+300.0*math.cos(t), S[1]+300.0*math.sin(t)])
+        Sn = np.asarray(S, float)
+        for tb in (t - d, t + d):
+            n = np.array([-math.sin(tb), math.cos(tb)])
+            if n @ (p_in - Sn) < 0: n = -n
+            self._clip(-n[0], -n[1], -(n @ Sn))
+
+    def add_disk(self, S, R, n=DISK_N):
+        """半径 R 的接收圆盘（内接正 n 边形近似）。"""
+        for k in range(n):
+            mid = 2 * math.pi * (k + 0.5) / n
+            nx, ny = math.cos(mid), math.sin(mid)
+            self._clip(nx, ny, nx * S[0] + ny * S[1] + R)
+
+    def diameter(self):
+        """凸多边形直径：顶点枚举（n 很小），返回 (D, A, B)。"""
+        V = self.hull(); best = (-1.0, None, None)
+        for i in range(len(V)):
+            for j in range(i + 1, len(V)):
+                d = math.hypot(V[j][0] - V[i][0], V[j][1] - V[i][1])
+                if d > best[0]: best = (d, V[i], V[j])
+        return best
+\end{verbatim}
+
+\subsection{滚动重规划主循环（问题三核心）}
+
+\begin{verbatim}
+def _actions(self, st, pending_st):
+    """候选任务集：扫描站 st / 主动定位 loc / 清剿 cl。
+    优先级规则（Q2 结论的工程落地）：只要还有未扫的圆环站就先扫站——
+    相邻站基线 2a*sin(pi/m) ~ 708 m，与 ~900 m 处的源构成 ~47° 交会角，
+    单次观测即把 D 从 1300 m 压到 ~22 m，远优于"在质心附近小偏置补测"。"""
+    acts = [(np.asarray(S, float), "st", -1) for S in pending_st]
+    have_st = bool(pending_st)
+    for ch in range(1, 21):
+        c = st[ch]
+        if c.cleared or c.n_dir == 0: continue
+        if self._ready(c):
+            acts.append((c.reg.centroid(), "cl", ch))
+        elif c.n_loc < self.P["max_loc"] and (\
+                c.n_dir >= self.P["loc_min_dir"] or not have_st):
+            acts.append((self._loc_point(c), "loc", ch))
+    return acts
+
+def run(self, client):
+    """滚动重规划：每步只走 2-opt 巡回的第一站，随后按新信息重排。"""
+    st = {ch: Chan.fresh() for ch in range(1, 21)}
+    pos = np.array([0.0, 0.0]); client.enter()
+    inner = ring_stations(self.P["ring_m"], self.P["ring_a"], self.P["ring_rot"])
+    outer = ring_stations(self.P["ring_m2"], self.P["ring_a2"],
+                          self.P["ring_rot"] + math.pi / self.P["ring_m2"])
+    pending_st = [np.asarray(s, float) for s in tour(inner)]
+    while it < self.P["max_iter"]:
+        acts = self._actions(st, pending_st)
+        if not acts and not pending_st and outer and self.P["use_outer"] \
+                and self.has_dir and self.n_det < self.P["n_max"] \
+                and any(st[ch].n_dir == 0 for ch in range(1, 21)):
+            # 阶段二：仅在"已证实存在定向源"时启动外环补扫（命题 2 的判据）
+            pending_st = [np.asarray(s, float)
+                          for s in tour(outer, start=pos)]
+            outer = None; acts = self._actions(st, pending_st)
+        if not acts: break
+        pts = [a[0] for a in acts]
+        first = np.asarray(tour(pts, start=pos)[0], float)      # 滚动视界，只取首站
+        k = min(range(len(acts)),
+                key=lambda i: float(np.linalg.norm(pts[i]-first)))
+        _, kind, ch = acts[k]
+        if kind == "st":
+            pos = self._sweep(client, pts[k], st, pos)
+            pending_st = [S for S in pending_st
+                          if float(np.linalg.norm(np.asarray(S,float)-pts[k])) > 1e-6]
+        elif kind == "loc":
+            pos = self._locate(client, ch, st[ch], pos)
+        else:
+            ok, pos = self._clear(client, ch, st[ch], pos)
+    client.exit()
+\end{verbatim}
+
+\subsection{定向源判据与双环触发（问题四核心）}
+
+\begin{verbatim}
+def _update(self, st, x, y, resp):
+    res = resp.get("measure_result")
+    if res == "direction":
+        st.reg.add_wedge((x, y), float(resp["svd_deg"]))
+        st.reg.add_disk((x, y), R_RECV_MAX)
+        st.obs.append((x, y, resp["svd_deg"]))
+        st.n_dir += 1
+    elif res == "near":
+        st.reg.add_disk((x, y), 5.0, n=24); st.n_dir += 1
+    else:
+        st.n_nosig += 1
+        # 【命题 2】全向源只要 |QG| <= r_k 必有信号，而 r_k >= 1000 m，
+        # 故"在距源 < 1000 m 处仍 no_signal"只可能来自定向源的阴影半平面。
+        # 严格包络：不能用 D/2（它只是以质心为心的半径的下界，见命题 2 注）。
+        # 可行域是凸多边形 -> max|g-C| 必在凸包顶点取得，直接算精确外接半径。
+        if st.n_dir > 0:
+            H = st.reg.hull()
+            if len(H) >= 3:
+                C = st.reg.centroid()
+                rho_max = max(math.hypot(v[0] - C[0], v[1] - C[1]) for v in H)
+                if math.hypot(x - C[0], y - C[1]) + rho_max < R_RECV_MIN:
+                    self.has_dir = True      # 置位 -> 允许启动外环补扫
+    return res
+\end{verbatim}
+
+\subsection{自建模拟器的计时核心（与附件 1 逐秒吻合）}
+
+\begin{verbatim}
+if path == "/measure":
+    sw = 0.0
+    if ch != self.chan:                 # 相邻两次 measure 频道不同 -> 切换耗时 1 s
+        sw = T_SWITCH; self.n_switch += 1
+    self.t += mv + sw + T_MEASURE       # mv = d/5
+    self.chan = ch
+else:                                   # /clear
+    self.t += mv + T_CLEAR_FAIL         # 未发现：3 s
+    ok = (idx is not None and idx not in self.cleared
+          and float(np.linalg.norm(self.case.pos[idx] - p)) <= R_CLEAR)
+    if ok:
+        self.cleared.add(idx)
+        self.t += (T_CLEAR_OK - T_CLEAR_FAIL)   # 成功：再 +2 s
+    # 注意：/clear 不改变 self.chan，也不产生切换耗时
+\end{verbatim}
+

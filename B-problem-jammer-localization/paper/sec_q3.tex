@@ -1,0 +1,160 @@
+\section{问题三：全向干扰源的最短时间搜索—清除策略}
+\label{sec:q3}
+
+\subsection{先算清"下界"，再谈"优化"}
+
+由式~\eqref{eq:T}，时间由四部分构成。我们先把"任何策略都无法避免"的部分算出来，才能判断一个方案是否接近最优。
+
+\noindent\textbf{（i）覆盖下界。} 设在半径 $a$ 的圆环上布 $m$ 个等角观测点。由于有效接收半径下界 $r_{\min}=1000$ m，\textbf{要保证任意位置的源都能被至少一个观测点收到}，需满足
+\begin{equation}
+\underbrace{a\ \le\ 1000}_{\text{圆心处}},\qquad
+\underbrace{a^2-2Ra\cos\tfrac{\pi}{m}+R^2\ \le\ r_{\min}^2}_{R=1800,\ \text{相邻两站连线中点处}} .
+\label{eq:cover}
+\end{equation}
+第二式给出 $a\in[a_-(m),a_+(m)]$，其中 $a_\pm=R\cos\frac{\pi}{m}\pm\sqrt{R^2\cos^2\frac{\pi}{m}-(R^2-r_{\min}^2)}$。求解：
+
+\begin{table}[H]
+\centering
+\caption{保证覆盖所需的最小站数（$r_{\min}=1000$ m，$R=1800$ m）。环周长与巡回路程由 \texttt{q3\_bounds.py} 复算}
+\label{tab:cover}
+\small
+\setlength{\tabcolsep}{3.4pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+$m$ & $5$ & $6$ & $7$ & $8$ & $9$ & $12$ \\
+\midrule
+可行 $a$ 区间 & $\varnothing$ & $[1123,1995]$ & $[997.2,\,2246.3]$ & $[938.1,\,2387.9]$ & $[903.4,\,2479.5]$ & $[853.8,\,2623.5]$ \\
+与 $a\leq1000$ 求交 & $\varnothing$ & $\varnothing$ & $[997.2,\,1000]$ & $[938.1,\,1000]$ & $[903.4,\,1000]$ & $[853.8,\,1000]$ \\
+环周长（$a{=}1000$ m）/ m & --- & --- & $\bm{6074}$ & $6123$ & $6156$ & $6212$ \\
+自圆心入环巡回路程 / m & --- & --- & $\bm{7074}$ & $7123$ & $7156$ & $7212$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\textbf{结论：$m=6$ 时两式矛盾（要求 $a\ge1123$ 且 $a\le1000$），保证覆盖的等角圆环最少需要 $7$ 个观测点。} 这是一个必须写清的\textbf{负结论}：它说明"少布几个点、多扫几遍"在几何上不可行，站数的下界是 $7$ 而不是 $4$（按面积算 $\lceil R^2/r_{\min}^2\rceil=4$ 只是必要不充分条件）。注意 $m=7$ 时 $a$ 的可行区间\emph{极窄}（$997.3\!\sim\!1000$ m），这决定了实际布站应取 $a\approx1000$ m（贴近该窄区间的上端）；若把 $a$ 压到 $925$ m 以下，虽在 $r_k>1000$ m 的多数情形下仍能覆盖，但$r_k$ 取下界的最不利情形会失去保证。
+
+\noindent\textbf{（ii）检测下界。} 一次全频段扫描 $20$ 个频道需
+\begin{equation}
+t_{\rm sweep}=20\times5+19\times1=119\ \text{s}.
+\end{equation}
+
+\noindent\textbf{（iii）路程下界（oracle）。} 若机器狗事先知道全部源位置，则最优路程是"起点$\,+\,$全部源"的旅行商问题；但本问必须走访覆盖环才能发现源，故\textbf{可比的标尺}是"起点$\,+\,$源$\,+\,$覆盖环 $7$ 站"的合并路线。用最近邻 $+$ 2-opt（多起点重启，$n\le17$ 时通常即最优）求解，$50$ 组随机构型（$N$ 取 $10/13/16$）平均（\texttt{q3\_bounds.py}）：
+
+\begin{center}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lccc@{\qquad}c}
+\toprule
+& $N=10$ & $N=13$ & $N=16$ & 三档平均 \\
+\midrule
+理想下界：起点$\,+\,$源 & $8216$ m & $9608$ m & $10\,531$ m & $9452$ m $=1890$ s \\
+\textbf{有效下界：起点$\,+\,$源$\,+\,$覆盖环 $7$ 站} & $10\,253$ m & $11\,541$ m & $12\,813$ m & $\bm{11\,536}$ m $\bm{=2307}$ s \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+因此\textbf{理想情况下的时间下界约 $1890$ s}；而对"必须走访全部覆盖环"的策略，\textbf{真正的参照是 $2307$ s}。后文即以此标尺衡量。
+
+\noindent\textbf{（iv）为什么不能"先全覆盖再清剿"。} 一个自然的想法是"先把 $7$ 个站扫完拿到全部源位置，再规划清剿路线"。我们用 \texttt{order\_ablation.py} 做单因子对照（全向、$50$ 局，只切换 \texttt{two\_pass} 开关）：两趟式路程 $15\,567$ m、总时间 $3929$ s、检测 $124.3$ 次；滚动重规划 $14\,765$ m、$3661$ s、$106.2$ 次，即\textbf{路程省 $5.1\%$、时间省 $6.8\%$、检测次数省 $14.6\%$}。收益有两个来源：清剿目标与扫描站在空间上交错，两趟式被迫往返；而边扫边清还能\textbf{避免对同一频道的重复扫描}（先扫时只拿到方位，回头清剿仍需补测）。因此正确做法是把扫描与清剿放进同一条路径，边扫边清（下文算法）。
+
+\subsection{\texorpdfstring{算法总览：三层任务 $+$ 滚动重规划}{算法总览：三层任务 + 滚动重规划}}
+
+我们把每个频道的状态记为 $(\Reg_k,\ n_k^{\rm dir},\ n_k^{\rm loc},\ \text{cleared}_k)$，其中 $\Reg_k$ 为式~\eqref{eq:region} 的可行域、$n^{\rm dir}$ 为有效方位数、$n^{\rm loc}$ 为主动定位次数。
+
+\medskip
+\noindent\textbf{算法 3（滚动重规划 Rolling Re-planning）}
+
+每一步都做三件事：
+
+\textbf{Step 1 —— 生成候选任务集}（三类）：
+\begin{equation}
+\mathcal T=\underbrace{\{S_i:\ \text{未扫的观测站}\}}_{\text{扫}}
+\ \cup\ \underbrace{\{c_k:\ \diam(\Reg_k)\le D_{\rm ready}\}}_{\text{清剿}}
+\ \cup\ \underbrace{\{L_k:\ \text{几何病态待补测}\}}_{\text{主动定位}} .
+\end{equation}
+
+\textbf{Step 2 —— 滚动 TSP 选点}：以当前位置为起点，对 $\mathcal T$ 的"代表点"（站取自身坐标，清剿取可行域质心，定位取式~\eqref{eq:loc} 的探测点）做最近邻 $+$ $2$-opt，\textbf{只执行巡回的第一站}，随后丢弃整个排序、按新信息重排。这一"视界为 1"的设计使算法能立刻响应"扫描某站后突然有多个频道变可清剿"的事件。
+
+\textbf{Step 3 —— 执行该动作并更新}$\Reg$：清扫一个站 $\to$ 对未跳过频道逐个 \texttt{/measure}；若返回 \texttt{near} 则原地 \texttt{/clear}（零移动代价）。清剿一个频道 $\to$ 见 6.4。主动定位 $\to$ 见 6.4。
+
+\medskip
+\noindent\textbf{跳过规则（节省检测次数）}：在观测站 $S$ 上，若频道 $k$ 已有方位且 $\diam(\Reg_k)\le D_{\rm skip}=45$ m，说明其位置已足够精确，\textbf{不再检测}。这使得 $7$ 个站的总检测次数从 $140$ 次降到约 $110$ 次。
+
+\noindent\textbf{终止规则}：$\text{n}_{\rm det}$（已获得方位数的频道数）达到题目上限 $16$ 时立即停止一切扫描；否则扫完 7 站后进入"补测"循环。
+
+\subsection{子算法}
+
+\noindent\textbf{（a）可行域更新。} 见式~\eqref{eq:wedge}--\eqref{eq:region}，用 Sutherland--Hodgman 裁剪，圆盘用 $72$ 边形近似，$O(nK)$ 且数值稳定。\texttt{near} 时把该频道的可行域直接收缩为半径 $5$ m 的小圆盘。
+
+\noindent\textbf{（b）主动定位点（问题二结论的工程落地）。} 当某频道只有 $1$ 个方位时，$\Reg_k$ 是一条沿视线的窄楔形，$\diam\approx1300$ m，永远不会触发清剿。此时取第二个探测点
+\begin{equation}
+L_k=P_0+t\,u+\sigma\,\delta\,w,\qquad u=\frac{C-P_0}{\|C-P_0\|},\ w\perp u,\ \ t=0.35\!\sim\!0.6\,t_{\max},\ \delta=t/2,
+\label{eq:loc}
+\end{equation}
+其中 $P_0$ 为最近一次观测点、$C$ 为 $\Reg_k$ 质心、$t_{\max}$ 为区域在视线方向的最大延伸、$\sigma=\pm1$ 为正反两侧。交会角 $\theta\approx\arctan(\delta/t)\approx27^\circ$，足以把 $\diam$ 从 $1300$ m 压到数十米。
+
+\begin{quote}
+\textbf{这里有一个致命陷阱}（问题一/二的几何知识直接救场）：若按"区域质心（即视线末端 $\sim$1000 m 深处）$+\,$侧移 $200$ m"取点，交会角只有 $\arctan(200/1000)\approx11^\circ$，\textbf{区域几乎不收缩，且对定向源会整片落入阴影}。因此必须取\textbf{中等深度}（$t\approx0.35\!\sim\!0.6\,t_{\max}$）而不是末端。第~\ref{sec:q4} 节将看到这一细节对问题四成败的决定性作用。
+\end{quote}
+
+\noindent\textbf{（c）清剿。} 当 $\diam(\Reg_k)\le D_{\rm ready}=100$ m 时，按 $24$ m 间距在 $\Reg_k$ 内生成网格候选点（$24<\sqrt2\cdot20$，保证网格点的 $20$ m 覆盖圆盘能盖住整片区域），按"离当前位置由近及远"依次 \texttt{/clear}；全部失败后改为"以质心为中心、半径 $18$ m 的 $12$ 点环"再扫一圈作为兜底。清剿失败时把阈值收紧（$D_{\rm ready}/(1+2f)$，$f$ 为失败次数），避免在错误区域反复消耗。
+
+\subsection{自建等价模拟器与计时校验}
+
+官方模拟器仅提供 Windows 64 位版本（\texttt{Jammers-simulator-win64.7z}），无法在当前环境运行。我们依据题面附录 1/2 与附件 1《模拟器使用说明》、附件 2《通信接口说明及编程指南》\textbf{用 Python 复刻了语义完全等价的模拟器}，包括：
+
+\begin{itemize}
+  \item 四条指令 \texttt{/enter}、\texttt{/measure}、\texttt{/clear}、\texttt{/exit} 与 HTTP 状态码、字段合法性校验（未声明字段 $\to$ \texttt{accepted=false}，缺字段 $\to$ HTTP $400$，\texttt{robot\_id}/\texttt{arena\_id} 校验）；
+  \item \textbf{request\_id 幂等性}：同 id 同内容返回首次响应；同 id 改内容返回 $409$。客户端只在重试时复用原 id；
+  \item \textbf{虚拟计时}：移动 $d/5$、换频道 $1$ s、检测 $5$ s、清除 $3/5$ s，且 \texttt{/clear} 不改变测向机当前频道（因此后续 \texttt{/measure} 可能\textbf{不}产生切换耗时）——这是最容易实现错的一条；
+  \item 三种返回语义（\texttt{direction}$+$\texttt{svd\_deg} / \texttt{near} / \texttt{no\_signal}）、$20$ m 清除半径、\texttt{near} 阈值 $5$ m、定向源半平面覆盖。
+\end{itemize}
+
+\noindent\textbf{校验}：附件 1 表 2 的示例给出了逐条指令后的虚拟时刻 $105$、$111$、$194$、$199$ s（其中第 $5$ 步因前一步 \texttt{/clear} 未切换频道而不产生切换耗时）。自建模拟器\textbf{逐秒复现了这四个时刻}，说明计时规则实现正确。程序中策略与模拟器通过统一的 \texttt{transport} 接口解耦，把 \texttt{LocalTransport} 换成 \texttt{HttpTransport} 即可直接对官方模拟器运行。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{B_fig5_q3_time.png}
+\caption{问题三：(a) 单局时间构成，移动占主导；(b) 累积清除进度；(c) 衔接问题四——总时间分布随定向源比例的变化（各 $50$ 局，$0\%$ 即纯全向场景）}
+\label{fig:q3time}
+\end{figure}
+
+\subsection{演练测试结果}
+
+在自建模拟器上做 $50$ 局蒙特卡洛演练（源个数 $N\sim U\{10,\dots,16\}$、位置圆盘内均匀、$r_k\sim U[1000,1500]$、频道从 $1\!\sim\!20$ 中无重复抽取），误差场用三种独立模型各测一遍（平滑随机场、独立同分布、分块常值场）：
+
+\begin{table}[H]
+\centering
+\caption{问题三 演练测试结果（全向干扰源，每组 $50$ 局）}
+\label{tab:q3res}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+误差场模型 & 清除比例 & 全清 & 总时间均值/s & 中位/s & 最短/s & 最长/s & 平均每源/s \\
+\midrule
+平滑场（$L=1500$ m） & $\bm{100.00\%}$ & $\mathbf{50/50}$ & $3754$ & $3610$ & $3037$ & $5062$ & $293$ \\
+平滑场（$L=600$ m）  & $100.00\%$ & $50/50$ & $3722$ & $3613$ & $2976$ & $4938$ & $291$ \\
+独立同分布           & $100.00\%$ & $50/50$ & $3744$ & $3634$ & $3001$ & $4962$ & $292$ \\
+分块常值场（$200$ m） & $100.00\%$ & $50/50$ & $3727$ & $3614$ & $3015$ & $4957$ & $291$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{结果解读}：
+\begin{enumerate}
+  \item \textbf{$50$ 局全部 $100\%$ 清除}，总时间均值 $3754$ s、中位 $3610$ s、四分位区间 $[3390,4074]$ s，平均每源 $293$ s；
+  \item 与 oracle 有效下界 $2307$ s（起点$\,+\,$源$\,+\,$覆盖环）相比，本文策略 $3754$ s 约为其 $\bm{1.63}$ 倍——考虑到策略必须在\emph{未知}源位置的前提下先做搜索、还要付出主动定位的额外移动，这一比值已相当接近可行极限；
+  \item \textbf{对误差场模型完全鲁棒}：四种模型下清除率均为 $100\%$、总时间差异 $<1\%$。这并非巧合，而是集值估计的必然结果——策略只使用了 $\pm1^\circ$ 这个\textbf{硬界}，从不假设误差的分布或相关结构（\textbf{这正呼应洞察 1}：把误差当白噪声反而会引入不必要的模型风险）；
+  \item 时间构成中\textbf{移动占 $79\%$}（$3754$ s 中约 $2970$ s），检测约 $15\%$、换频道约 $3\%$。故进一步优化的唯一有效方向是压缩路程：本文的滚动重规划把移动由两趟式的 $15\,567$ m 降到 $14\,765$ m，距有效下界 $11\,536$ m 尚有约 $28\%$ 的余量（余量主要来自主动定位与清剿时的局部往返，见第~\ref{sec:q4} 节）。
+\end{enumerate}
+
+\subsection{提交与工程实现要点}
+
+\begin{itemize}
+  \item \textbf{真实运行时间约束}：题面要求 \texttt{/enter} 后程序运行不超过 $1200$ s、测试窗口 $25$ min。本文策略的单局墙体运行时间远小于 $1$ s（本地仿真），对官方模拟器只需把网络往返控制在可接受范围，并\textbf{限制总请求数}（单局约 $110$ 次 \texttt{/measure} $+$ $16$ 次 \texttt{/clear}）；
+  \item \textbf{日志体积}：题面限制加密日志 $\le2$ MB，故客户端只记录必要字段，且对同一 \texttt{request\_id} 的重试\textbf{复用原 payload}（既满足幂等语义，也避免日志膨胀）；
+  \item \textbf{坐标范围}：机器狗可以移出目标区域（用于追索区域边缘的源），但坐标分量绝对值不得超过 $2\times10^6$，本文策略自动对候选点做合法域裁剪。
+\end{itemize}
