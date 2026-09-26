@@ -40,11 +40,23 @@ paper/  main.tex + tables_gen_p1–4.tex + gen_tables.py（论文全部表格由
 
 ## 四、复现
 
+官方附件在仓库根目录 `problems/C题_附件/`。代码按固定相对路径读取附件
+（`cumcm_core.py: DATA_DIR = code/../data/附件`），clone 后先摆一次：
+
 ```bash
+cd C-problem-microgrid
+mkdir -p data && cp -r ../problems/C题_附件 data/附件
+```
+
+然后按顺序运行：
+
+```bash
+cd code
 python3 04_p1.py && python3 05_p2.py && python3 06_p3.py && python3 07_p4.py   # 四问
-python3 18_sdp.py        # SDP 基准（~30 s）
-python3 19_mpc_penalty.py && python3 19_mpc_penalty.py  # MPC-II
-python3 22_paper_tables.py  # 重新生成论文全部表格
+python3 18_sdp.py                        # SDP 基准（~30 s）
+python3 19_mpc_penalty.py                # MPC-II 罚金感知滚动
+python3 22_paper_tables.py               # 重新生成论文全部表格
 ```
 
 依赖：python3 + numpy + pandas + scipy（内置 HiGHS 求解器）。全流程 < 2 分钟。
+附件5 为官方结果填报模板（空模板），随题目一起收录在 `problems/`。

@@ -8,6 +8,7 @@
 | 类型 | 机器人自主搜索 / 集值估计 / 策略优化 | 随机优化 / 滚动时域控制（MPC） |
 | 目录 | [`B-problem-jammer-localization/`](B-problem-jammer-localization/) | [`C-problem-microgrid/`](C-problem-microgrid/) |
 | 论文 | [paper/main.pdf](B-problem-jammer-localization/paper/main.pdf) | [paper/main.pdf](C-problem-microgrid/paper/main.pdf) |
+| 官方题目与附件 | [problems/](problems/)（题目+附件，版权归竞赛组委会） | 同左 |
 
 两题均做到：**每一个数字都可复现**（脚本一键运行），论文正文与代码产出严格对齐。
 
@@ -58,6 +59,10 @@ SDP 的定位是**最优性基准而非最优性证明**：Bellman 最优性原�
 ## 仓库结构
 
 ```
+├── problems/                    # 官方题目与附件（版权归竞赛组委会，见该目录 README）
+│   ├── B题.pdf · C题.pdf
+│   ├── B题_附件/                # 模拟器使用说明、通信接口说明
+│   └── C题_附件/                # 附件1–4 数据 + 附件5 结果模板
 ├── B-problem-jammer-localization/
 │   ├── README.md            # B 题解法说明
 │   ├── docs/                # 题目理解与建模方案（含全部实测依据）
@@ -73,10 +78,14 @@ SDP 的定位是**最优性基准而非最优性证明**：Bellman 最优性原�
 ## 复现
 
 ```bash
-# C 题（全流程 < 2 分钟，python3 + numpy/pandas/scipy[HiGHS]）
-cd C-problem-microgrid/code && python3 04_p1.py && python3 05_p2.py && python3 06_p3.py && python3 07_p4.py
+# C 题：先把官方附件放到代码约定的相对路径（DATA_DIR = code/../data/附件）
+cd C-problem-microgrid
+mkdir -p data && cp -r ../problems/C题_附件 data/附件
 
-# B 题（本地模拟器蒙特卡洛评估）
+# C 题全流程（< 2 分钟，python3 + numpy/pandas/scipy[HiGHS]）
+cd code && python3 04_p1.py && python3 05_p2.py && python3 06_p3.py && python3 07_p4.py
+
+# B 题（本地自研模拟器，不依赖官方附件）
 cd B-problem-jammer-localization/code_sim && python3 final_eval.py
 ```
 
